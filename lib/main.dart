@@ -5,13 +5,10 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
-void main() async {
-  const isProd = bool.fromEnvironment('PROD', defaultValue: false);
-  await dotenv.load(fileName: isProd ? ".env.production" : ".env");
+void main() {
   runApp(const MyApp());
 }
 
@@ -58,7 +55,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   bool _usandoGPS = true;
   final TextEditingController _cidadeController = TextEditingController();
 
-  final String apiKey = dotenv.env['API_KEY'] ?? '';
+  static const String apiKey = String.fromEnvironment('API_KEY');
 
   @override
   void initState() {
