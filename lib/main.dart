@@ -99,43 +99,6 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     );
   }
 
-  Color get _neuBaseColor {
-    return iconeUrl.contains('d@2x.png')
-        ? const Color(0xFF2E5395)
-        : const Color(0xFF0A1B4D);
-  }
-
-  Widget _softCard(Widget child, {double radius = 25, bool raised = true}) {
-    final base = _neuBaseColor;
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color.lerp(base, Colors.white, raised ? 0.12 : 0.04)!,
-            base,
-            Color.lerp(base, Colors.black, raised ? 0.28 : 0.14)!,
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.35),
-            offset: raised ? const Offset(5, 5) : const Offset(2, 2),
-            blurRadius: raised ? 12 : 8,
-          ),
-          BoxShadow(
-            color: Colors.white.withOpacity(0.10),
-            offset: raised ? const Offset(-4, -4) : const Offset(-2, -2),
-            blurRadius: raised ? 10 : 6,
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-
   Future<void> _pegarClimaPorGPS() async {
     setState(() {
       carregando = true;
@@ -906,73 +869,58 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                     }),
 
                   Center(
-                    child: _softCard(
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
-                        child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            temperatura,
-                            style: const TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w200,
-                              height: 1.1,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            condicao.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              letterSpacing: 1.8,
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.location_on,
-                                  color: Colors.white70, size: 11),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  nomeCidade,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          temperatura,
+                          style: const TextStyle(
+                            fontSize: 46,
+                            fontWeight: FontWeight.w200,
+                            height: 1.05,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black26,
+                                blurRadius: 10,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _miniInfo(Icons.water_drop, humidade),
-                              const SizedBox(width: 10),
-                              _miniInfo(Icons.air, vento),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          condicao.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 2,
+                            color: Colors.white.withOpacity(0.85),
+                            shadows: const [
+                              Shadow(color: Colors.black26, blurRadius: 6),
                             ],
                           ),
-                          const SizedBox(height: 3),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _miniInfo(Icons.wb_sunny, nascerSol),
-                              const SizedBox(width: 10),
-                              _miniInfo(Icons.nights_stay, porSol),
-                            ],
-                          ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on,
+                                color: Colors.white70, size: 12),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                nomeCidade,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ),
 
                   if (iconeUrl.isNotEmpty)
                     Positioned(
@@ -1055,24 +1003,47 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     );
   }
 
-  Widget _miniInfo(IconData icone, String texto) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icone, color: Colors.white70, size: 11),
-          const SizedBox(width: 3),
-          Text(
-            texto,
-            style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.8)),
-          ),
-        ],
+  Widget _buildInfoRow() {
+    return Row(
+      children: [
+        _infoCard(Icons.water_drop, "Umidade", humidade),
+        const SizedBox(width: 8),
+        _infoCard(Icons.air, "Vento", vento),
+        const SizedBox(width: 8),
+        _infoCard(Icons.wb_sunny, "Nascer do Sol", nascerSol),
+        const SizedBox(width: 8),
+        _infoCard(Icons.nights_stay, "Pôr do Sol", porSol),
+      ],
+    );
+  }
+
+  Widget _infoCard(IconData icone, String label, String valor) {
+    return Expanded(
+      child: GFCard(
+        color: Colors.white.withOpacity(0.12),
+        elevation: 2,
+        borderRadius: BorderRadius.circular(16),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icone, color: Colors.white70, size: 16),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(fontSize: 9, color: Colors.white60),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              valor,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1212,6 +1183,8 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(height: 12),
+                                  _buildInfoRow(),
                                   const SizedBox(height: 12),
                                   _buildEsportesAQIRow(),
                                   if (_previsaoHoras.isNotEmpty) ...[
