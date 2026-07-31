@@ -8,7 +8,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:getwidget/getwidget.dart';
 import 'package:latlong2/latlong.dart' hide Path;
-import 'package:rive/rive.dart' hide PaintingStyle;
 
 void main() {
   runApp(const MyApp());
@@ -732,7 +731,30 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                     Positioned(
                       top: h * 0.08,
                       left: w * 0.1,
-                      child: const _SolRive(),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const RadialGradient(
+                            colors: [Colors.amber, Colors.orange],
+                            radius: 0.7,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.amber.withOpacity(0.4),
+                              blurRadius: 40,
+                              spreadRadius: 15,
+                            ),
+                          ],
+                        ),
+                      )
+                          .animate(onPlay: (c) => c.repeat())
+                          .scale(
+                            duration: const Duration(seconds: 3),
+                            begin: const Offset(0.9, 0.9),
+                            end: const Offset(1.1, 1.1),
+                          ),
                     ),
 
                   ...List.generate(isNublado ? 5 : 3, (i) {
@@ -1332,56 +1354,4 @@ class BirdPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant BirdPainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.flap != flap;
-}
-
-class _SolRive extends StatelessWidget {
-  const _SolRive();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 50,
-      height: 50,
-      child: RiveWidgetBuilder(
-        fileLoader: FileLoader.fromAsset(
-          'assets/animations/vehicles.riv',
-          riveFactory: Factory.rive,
-        ),
-        builder: (context, state) => switch (state) {
-          RiveLoading() => _solFallback(),
-          RiveFailed() => _solFallback(),
-          RiveLoaded() => RiveWidget(
-              controller: state.controller,
-              fit: Fit.cover,
-            ),
-        },
-      ),
-    ).animate(onPlay: (c) => c.repeat())
-      .scale(
-        duration: const Duration(seconds: 3),
-        begin: const Offset(0.9, 0.9),
-        end: const Offset(1.1, 1.1),
-      );
-  }
-
-  Widget _solFallback() {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const RadialGradient(
-          colors: [Colors.amber, Colors.orange],
-          radius: 0.7,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.amber.withOpacity(0.4),
-            blurRadius: 40,
-            spreadRadius: 15,
-          ),
-        ],
-      ),
-    );
-  }
 }
