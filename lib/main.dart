@@ -70,29 +70,11 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   }
 
   List<Color> _getGradient() {
-    bool isDay = iconeUrl.contains('d@2x.png');
-    bool isChuva = condicao.contains('chuva') || condicao.contains('chuvas');
-    bool isTempestade =
-        condicao.contains('trovoada') || condicao.contains('tempestade');
-    bool isNeve = condicao.contains('neve');
-    bool isNublado =
-        condicao.contains('nublado') || condicao.contains('nuvens');
-    bool isCeuLimpo =
-        condicao.contains('céu limpo') || condicao.contains('ensolarado');
-
-    if (isTempestade) return [Colors.grey[900]!, Colors.orange[800]!];
-    if (isNeve) return [Colors.blueGrey[50]!, Colors.blueGrey[300]!];
-    if (isChuva) return [Colors.blueGrey[900]!, Colors.indigo[700]!];
-
+    final bool isDay = iconeUrl.contains('d@2x.png');
     if (isDay) {
-      if (isCeuLimpo) return [Colors.blue[400]!, Colors.amber[200]!];
-      if (isNublado) return [Colors.blueGrey[600]!, Colors.blueGrey[300]!];
-    } else {
-      if (isCeuLimpo) return [Colors.indigo[900]!, Colors.purple[800]!];
-      if (isNublado) return [Colors.grey[900]!, Colors.blueGrey[800]!];
+      return const [Color(0xFF0D47A1), Color(0xFF42A5F5)];
     }
-
-    return [Colors.blueGrey[700]!, Colors.blueGrey[500]!];
+    return const [Color(0xFF030614), Color(0xFF0A1B4D)];
   }
 
   Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
