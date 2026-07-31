@@ -494,6 +494,13 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     bool isCeuLimpo =
         condicao.contains('céu limpo') || condicao.contains('ensolarado');
     bool isVento = condicao.contains('vento');
+    bool mostrarPassaros = condicao.isNotEmpty &&
+        !condicao.contains('chuva') &&
+        !condicao.contains('chuvas') &&
+        !condicao.contains('trovoada') &&
+        !condicao.contains('tempestade') &&
+        !condicao.contains('neve') &&
+        !condicao.contains('granizo');
     int moonPhase = getMoonPhase(DateTime.now());
     return ClipRRect(
       borderRadius: BorderRadius.circular(25),
@@ -567,6 +574,41 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                             ),
                       );
                     }),
+
+                  if (mostrarPassaros) ...[
+                    _buildPassaro(
+                      color: Colors.white,
+                      top: h * 0.12,
+                      size: 22,
+                      duration: const Duration(seconds: 16),
+                      leftToRight: true,
+                      width: w,
+                    ),
+                    _buildPassaro(
+                      color: Colors.white,
+                      top: h * 0.27,
+                      size: 27,
+                      duration: const Duration(seconds: 21),
+                      leftToRight: true,
+                      width: w,
+                    ),
+                    _buildPassaro(
+                      color: Colors.black87,
+                      top: h * 0.17,
+                      size: 20,
+                      duration: const Duration(seconds: 15),
+                      leftToRight: false,
+                      width: w,
+                    ),
+                    _buildPassaro(
+                      color: Colors.black87,
+                      top: h * 0.33,
+                      size: 25,
+                      duration: const Duration(seconds: 19),
+                      leftToRight: false,
+                      width: w,
+                    ),
+                  ],
 
                   if (!isDay)
                     Positioned(
@@ -860,6 +902,40 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     );
   }
 
+  Widget _buildPassaro({
+    required Color color,
+    required double top,
+    required double size,
+    required Duration duration,
+    required bool leftToRight,
+    required double width,
+  }) {
+    return Positioned(
+      top: top,
+      left: leftToRight ? -size : width,
+      child: SizedBox(
+        width: size,
+        height: size * 0.7,
+        child: CustomPaint(
+          painter: BirdPainter(color: color),
+        ),
+      )
+          .animate(onPlay: (c) => c.repeat())
+          .moveX(
+            duration: duration,
+            begin: leftToRight ? -size : width + size,
+            end: leftToRight ? width + size : -size,
+            curve: Curves.linear,
+          )
+          .moveY(
+            duration: duration,
+            begin: -4,
+            end: 4,
+            curve: Curves.easeInOut,
+          ),
+    );
+  }
+
   Widget _miniInfo(IconData icone, String texto) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1113,4 +1189,32 @@ class MoonPhasePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant MoonPhasePainter oldDelegate) =>
       oldDelegate.phase != phase;
+}
+
+class BirdPainter extends CustomPainter {
+  final Color color;
+  BirdPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.055
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()
+      ..moveTo(0, size.height * 0.55)
+      ..quadraticBezierTo(size.width * 0.25, size.height * 0.15,
+          size.width * 0.5, size.height * 0.5)
+      ..quadraticBezierTo(size.width * 0.75, size.height * 0.15, size.width,
+          size.height * 0.55);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant BirdPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
