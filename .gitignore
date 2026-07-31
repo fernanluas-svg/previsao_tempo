@@ -46,3 +46,4 @@ app.*.map.json
 
 # Environment files (contain API keys)
 .env*
+.vercel
