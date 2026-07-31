@@ -6,7 +6,9 @@ import 'dart:ui';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:getwidget/getwidget.dart';
 import 'package:latlong2/latlong.dart' hide Path;
+import 'package:rive/rive.dart' hide PaintingStyle;
 
 void main() {
   runApp(const MyApp());
@@ -53,6 +55,9 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   double? _longitude;
   bool carregando = true;
   bool _usandoGPS = true;
+  bool _mapaVento = true;
+  bool _mapaChuva = true;
+  bool _mapaTemp = false;
   final TextEditingController _cidadeController = TextEditingController();
 
   static const String apiKey = String.fromEnvironment('API_KEY');
@@ -92,6 +97,43 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
           child: child,
         ),
       ),
+    );
+  }
+
+  Color get _neuBaseColor {
+    return iconeUrl.contains('d@2x.png')
+        ? const Color(0xFF2E5395)
+        : const Color(0xFF0A1B4D);
+  }
+
+  Widget _softCard(Widget child, {double radius = 25, bool raised = true}) {
+    final base = _neuBaseColor;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(base, Colors.white, raised ? 0.12 : 0.04)!,
+            base,
+            Color.lerp(base, Colors.black, raised ? 0.28 : 0.14)!,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            offset: raised ? const Offset(5, 5) : const Offset(2, 2),
+            blurRadius: raised ? 12 : 8,
+          ),
+          BoxShadow(
+            color: Colors.white.withOpacity(0.10),
+            offset: raised ? const Offset(-4, -4) : const Offset(-2, -2),
+            blurRadius: raised ? 10 : 6,
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 
@@ -320,7 +362,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
               const Icon(Icons.search, color: Colors.white70, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: TextField(
+                child: GFTextField(
                   controller: _cidadeController,
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                   decoration: const InputDecoration(
@@ -329,8 +371,10 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
                   ),
-                  onSubmitted: (value) {
+                  onFieldSubmitted: (value) {
                     if (value.isNotEmpty) _pegarClimaPorCidade(value);
                   },
                 ),
@@ -397,21 +441,24 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.previsao_tempo',
               ),
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=$apiKey',
-                userAgentPackageName: 'com.example.previsao_tempo',
-              ),
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=$apiKey',
-                userAgentPackageName: 'com.example.previsao_tempo',
-              ),
-              TileLayer(
-                urlTemplate:
-                    'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=$apiKey',
-                userAgentPackageName: 'com.example.previsao_tempo',
-              ),
+              if (_mapaChuva)
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=$apiKey',
+                  userAgentPackageName: 'com.example.previsao_tempo',
+                ),
+              if (_mapaVento)
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=$apiKey',
+                  userAgentPackageName: 'com.example.previsao_tempo',
+                ),
+              if (_mapaTemp)
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=$apiKey',
+                  userAgentPackageName: 'com.example.previsao_tempo',
+                ),
             ],
           ),
           Positioned(
@@ -423,20 +470,71 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                 color: Colors.black.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.map, color: Colors.white70, size: 12),
-                  SizedBox(width: 4),
+                  const Icon(Icons.map, color: Colors.white70, size: 12),
+                  const SizedBox(width: 4),
                   Text(
-                    "Vento • Chuva • Temp",
-                    style: TextStyle(color: Colors.white70, fontSize: 9),
+                    [
+                      if (_mapaVento) "Vento",
+                      if (_mapaChuva) "Chuva",
+                      if (_mapaTemp) "Temp",
+                    ].join(" • "),
+                    style: const TextStyle(color: Colors.white70, fontSize: 9),
                   ),
                 ],
               ),
             ),
           ),
+          Positioned(
+            bottom: 6,
+            left: 6,
+            right: 6,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLayerChip("💨", "Vento", _mapaVento, () {
+                  setState(() => _mapaVento = !_mapaVento);
+                }),
+                const SizedBox(width: 6),
+                _buildLayerChip("🌧️", "Chuva", _mapaChuva, () {
+                  setState(() => _mapaChuva = !_mapaChuva);
+                }),
+                const SizedBox(width: 6),
+                _buildLayerChip("🌡️", "Temp", _mapaTemp, () {
+                  setState(() => _mapaTemp = !_mapaTemp);
+                }),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLayerChip(
+      String emoji, String label, bool ativo, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: ativo ? Colors.white.withOpacity(0.25) : Colors.black.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: ativo ? Colors.white.withOpacity(0.4) : Colors.white.withOpacity(0.1),
+          ),
+        ),
+        child: Text(
+          "$emoji $label",
+          style: TextStyle(
+            fontSize: 9,
+            color: ativo ? Colors.white : Colors.white60,
+            fontWeight: ativo ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -450,9 +548,12 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, index) {
           var item = _previsaoHoras[index];
-          return _buildGlassCard(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-            child: Column(
+          return GFCard(
+            color: Colors.white.withOpacity(0.12),
+            elevation: 2,
+            borderRadius: BorderRadius.circular(18),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            content: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
@@ -631,30 +732,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                     Positioned(
                       top: h * 0.08,
                       left: w * 0.1,
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const RadialGradient(
-                            colors: [Colors.amber, Colors.orange],
-                            radius: 0.7,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.amber.withOpacity(0.4),
-                              blurRadius: 40,
-                              spreadRadius: 15,
-                            ),
-                          ],
-                        ),
-                      )
-                          .animate(onPlay: (c) => c.repeat())
-                          .scale(
-                            duration: const Duration(seconds: 3),
-                            begin: const Offset(0.9, 0.9),
-                            end: const Offset(1.1, 1.1),
-                          ),
+                      child: const _SolRive(),
                     ),
 
                   ...List.generate(isNublado ? 5 : 3, (i) {
@@ -806,83 +884,73 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                     }),
 
                   Center(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.35),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: Colors.white.withOpacity(0.15)),
+                    child: _softCard(
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                        child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            temperatura,
+                            style: const TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w200,
+                              height: 1.1,
+                            ),
                           ),
-                          child: Column(
+                          const SizedBox(height: 2),
+                          Text(
+                            condicao.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              letterSpacing: 1.8,
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
                             mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(
-                                temperatura,
-                                style: const TextStyle(
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w200,
-                                  height: 1.1,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                condicao.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  letterSpacing: 1.8,
-                                  color: Colors.white.withOpacity(0.8),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.location_on,
-                                      color: Colors.white70, size: 11),
-                                  const SizedBox(width: 3),
-                                  Flexible(
-                                    child: Text(
-                                      nomeCidade,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                              const Icon(Icons.location_on,
+                                  color: Colors.white70, size: 11),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(
+                                  nomeCidade,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _miniInfo(Icons.water_drop, humidade),
-                                  const SizedBox(width: 10),
-                                  _miniInfo(Icons.air, vento),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _miniInfo(Icons.wb_sunny, nascerSol),
-                                  const SizedBox(width: 10),
-                                  _miniInfo(Icons.nights_stay, porSol),
-                                ],
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _miniInfo(Icons.water_drop, humidade),
+                              const SizedBox(width: 10),
+                              _miniInfo(Icons.air, vento),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _miniInfo(Icons.wb_sunny, nascerSol),
+                              const SizedBox(width: 10),
+                              _miniInfo(Icons.nights_stay, porSol),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                ),
 
                   if (iconeUrl.isNotEmpty)
                     Positioned(
@@ -966,16 +1034,24 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   }
 
   Widget _miniInfo(IconData icone, String texto) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icone, color: Colors.white70, size: 11),
-        const SizedBox(width: 2),
-        Text(
-          texto,
-          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.8)),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icone, color: Colors.white70, size: 11),
+          const SizedBox(width: 3),
+          Text(
+            texto,
+            style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.8)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -984,63 +1060,53 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     return Row(
       children: [
         Expanded(
-          child: _buildGlassCard(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-            child: Row(
-              children: [
-                const Text("🏃‍♂️", style: TextStyle(fontSize: 24)),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Esportes",
-                        style: TextStyle(fontSize: 11, color: Colors.white60),
-                      ),
-                      Text(
-                        esportes['label'],
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: esportes['cor'],
-                        ),
-                      ),
-                    ],
-                  ),
+          child: GFCard(
+            color: Colors.white.withOpacity(0.12),
+            elevation: 2,
+            borderRadius: BorderRadius.circular(22),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            content: GFListTile(
+              avatar: const Text("🏃‍♂️", style: TextStyle(fontSize: 24)),
+              title: const Text(
+                "Esportes",
+                style: TextStyle(fontSize: 11, color: Colors.white60),
+              ),
+              subTitle: Text(
+                esportes['label'],
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: esportes['cor'],
                 ),
-              ],
+              ),
+              padding: const EdgeInsets.all(8),
+              margin: EdgeInsets.zero,
             ),
           ),
         ),
         if (aqi > 0) ...[
           const SizedBox(width: 10),
           Expanded(
-            child: _buildGlassCard(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-              child: Row(
-                children: [
-                  const Text("🌿", style: TextStyle(fontSize: 24)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Qualidade do Ar",
-                          style: TextStyle(fontSize: 11, color: Colors.white60),
-                        ),
-                        Text(
-                          aqiLabel,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: GFCard(
+              color: Colors.white.withOpacity(0.12),
+              elevation: 2,
+              borderRadius: BorderRadius.circular(22),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              content: GFListTile(
+                avatar: const Text("🌿", style: TextStyle(fontSize: 24)),
+                title: const Text(
+                  "Qualidade do Ar",
+                  style: TextStyle(fontSize: 11, color: Colors.white60),
+                ),
+                subTitle: Text(
+                  aqiLabel,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
+                ),
+                padding: const EdgeInsets.all(8),
+                margin: EdgeInsets.zero,
               ),
             ),
           ),
@@ -1086,7 +1152,8 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(fontSize: 18)),
                             const SizedBox(height: 30),
-                            ElevatedButton(
+                            GFButton(
+                              text: "TENTAR NOVAMENTE",
                               onPressed: () {
                                 if (_usandoGPS) {
                                   _pegarClimaPorGPS();
@@ -1095,7 +1162,10 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                                       _cidadeController.text);
                                 }
                               },
-                              child: const Text("TENTAR NOVAMENTE"),
+                              color: Colors.orange.shade400,
+                              textColor: Colors.black87,
+                              shape: GFButtonShape.pills,
+                              size: GFSize.LARGE,
                             ),
                           ],
                         ),
@@ -1262,4 +1332,56 @@ class BirdPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant BirdPainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.flap != flap;
+}
+
+class _SolRive extends StatelessWidget {
+  const _SolRive();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 50,
+      height: 50,
+      child: RiveWidgetBuilder(
+        fileLoader: FileLoader.fromAsset(
+          'assets/animations/vehicles.riv',
+          riveFactory: Factory.rive,
+        ),
+        builder: (context, state) => switch (state) {
+          RiveLoading() => _solFallback(),
+          RiveFailed() => _solFallback(),
+          RiveLoaded() => RiveWidget(
+              controller: state.controller,
+              fit: Fit.cover,
+            ),
+        },
+      ),
+    ).animate(onPlay: (c) => c.repeat())
+      .scale(
+        duration: const Duration(seconds: 3),
+        begin: const Offset(0.9, 0.9),
+        end: const Offset(1.1, 1.1),
+      );
+  }
+
+  Widget _solFallback() {
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          colors: [Colors.amber, Colors.orange],
+          radius: 0.7,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.amber.withOpacity(0.4),
+            blurRadius: 40,
+            spreadRadius: 15,
+          ),
+        ],
+      ),
+    );
+  }
 }
