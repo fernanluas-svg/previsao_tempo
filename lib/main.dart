@@ -583,6 +583,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                       duration: const Duration(seconds: 16),
                       leftToRight: true,
                       width: w,
+                      flapDelay: const Duration(milliseconds: 0),
                     ),
                     _buildPassaro(
                       color: Colors.white,
@@ -591,6 +592,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                       duration: const Duration(seconds: 21),
                       leftToRight: true,
                       width: w,
+                      flapDelay: const Duration(milliseconds: 120),
                     ),
                     _buildPassaro(
                       color: Colors.black87,
@@ -599,6 +601,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                       duration: const Duration(seconds: 15),
                       leftToRight: false,
                       width: w,
+                      flapDelay: const Duration(milliseconds: 60),
                     ),
                     _buildPassaro(
                       color: Colors.black87,
@@ -607,6 +610,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                       duration: const Duration(seconds: 19),
                       leftToRight: false,
                       width: w,
+                      flapDelay: const Duration(milliseconds: 180),
                     ),
                   ],
 
@@ -909,15 +913,39 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     required Duration duration,
     required bool leftToRight,
     required double width,
+    Duration flapDelay = Duration.zero,
   }) {
+    const Duration flapPhase = Duration(milliseconds: 110);
+
     return Positioned(
       top: top,
       left: leftToRight ? -size : width,
       child: SizedBox(
         width: size,
         height: size * 0.7,
-        child: CustomPaint(
-          painter: BirdPainter(color: color),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CustomPaint(
+              painter: BirdPainter(color: color, flap: 0.0),
+            ),
+            CustomPaint(
+              painter: BirdPainter(color: color, flap: 1.0),
+            )
+                .animate(
+                  delay: flapDelay,
+                  onPlay: (c) => c.repeat(),
+                )
+                .fadeIn(
+                  duration: flapPhase,
+                  curve: Curves.easeInOut,
+                )
+                .then()
+                .fadeOut(
+                  duration: flapPhase,
+                  curve: Curves.easeInOut,
+                ),
+          ],
         ),
       )
           .animate(onPlay: (c) => c.repeat())
@@ -927,10 +955,11 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
             end: leftToRight ? width + size : -size,
             curve: Curves.linear,
           )
+          .animate(onPlay: (c) => c.repeat(reverse: true))
           .moveY(
-            duration: duration,
-            begin: -4,
-            end: 4,
+            duration: Duration(milliseconds: (700 + size * 10).round()),
+            begin: -6.0,
+            end: 6.0,
             curve: Curves.easeInOut,
           ),
     );
@@ -1193,7 +1222,9 @@ class MoonPhasePainter extends CustomPainter {
 
 class BirdPainter extends CustomPainter {
   final Color color;
-  BirdPainter({required this.color});
+  final double flap;
+
+  BirdPainter({required this.color, this.flap = 0.0});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1204,17 +1235,31 @@ class BirdPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
+    final double tipY = size.height * (0.30 + 0.30 * flap);
+    final double ctrlY = size.height * (0.05 + 0.40 * flap);
+    final double bodyY = size.height * 0.50;
+
     final path = Path()
-      ..moveTo(0, size.height * 0.55)
-      ..quadraticBezierTo(size.width * 0.25, size.height * 0.15,
-          size.width * 0.5, size.height * 0.5)
-      ..quadraticBezierTo(size.width * 0.75, size.height * 0.15, size.width,
-          size.height * 0.55);
+      ..moveTo(0, tipY)
+      ..quadraticBezierTo(
+          size.width * 0.25, ctrlY, size.width * 0.5, bodyY)
+      ..quadraticBezierTo(
+          size.width * 0.75, ctrlY, size.width, tipY);
 
     canvas.drawPath(path, paint);
+
+    final bodyPaint = Paint()
+      ..color = color
+      ..strokeWidth = size.width * 0.05
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(size.width * 0.5, bodyY - size.height * 0.10),
+      Offset(size.width * 0.5, bodyY + size.height * 0.10),
+      bodyPaint,
+    );
   }
 
   @override
   bool shouldRepaint(covariant BirdPainter oldDelegate) =>
-      oldDelegate.color != color;
+      oldDelegate.color != color || oldDelegate.flap != flap;
 }
