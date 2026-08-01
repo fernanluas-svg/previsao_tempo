@@ -34,7 +34,9 @@ class PrevisaoTela extends StatefulWidget {
   State<PrevisaoTela> createState() => _PrevisaoTelaState();
 }
 
-class _PrevisaoTelaState extends State<PrevisaoTela> {
+class _PrevisaoTelaState extends State<PrevisaoTela>
+    with TickerProviderStateMixin {
+  late final MapController _mapController = MapController();
   String temperatura = "Buscando...";
   String condicao = "Carregando...";
   String nomeCidade = "Localização";
@@ -69,7 +71,31 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   @override
   void dispose() {
     _cidadeController.dispose();
+    _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _animarZoom(double delta) async {
+    final camera = _mapController.camera;
+    final alvo = (camera.zoom + delta)
+        .clamp(camera.minZoom ?? 3.0, camera.maxZoom ?? 19.0);
+    if (alvo == camera.zoom) return;
+
+    final inicio = camera.zoom;
+    final centro = camera.center;
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    final anim = CurvedAnimation(parent: controller, curve: Curves.easeOut);
+    controller.addListener(() {
+      _mapController.move(
+        centro,
+        inicio + (alvo - inicio) * anim.value,
+      );
+    });
+    await controller.forward();
+    controller.dispose();
   }
 
   List<Color> _getGradient() {
@@ -422,6 +448,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
       child: Stack(
         children: [
           FlutterMap(
+            mapController: _mapController,
             options: MapOptions(
               initialCenter: LatLng(_latitude!, _longitude!),
               initialZoom: 7.0,
@@ -525,6 +552,18 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
               ],
             ),
           ),
+          Positioned(
+            right: 8,
+            bottom: 44,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _botaoZoom(Icons.add, () => _animarZoom(1)),
+                const SizedBox(height: 8),
+                _botaoZoom(Icons.remove, () => _animarZoom(-1)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -566,6 +605,33 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
     setState(() {
       _mapaAtivo = _mapaAtivo == camada ? '' : camada;
     });
+  }
+
+  Widget _botaoZoom(IconData icone, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withOpacity(0.6)),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(icone, color: Colors.black87, size: 22),
+        ),
+      ),
+    );
   }
 
   Widget _buildLayerChip(
