@@ -54,7 +54,9 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   double? _longitude;
   bool carregando = true;
   bool _usandoGPS = true;
-  String _mapaAtivo = 'vento';
+  bool _mapaVento = true;
+  bool _mapaChuva = true;
+  bool _mapaTemp = false;
   final TextEditingController _cidadeController = TextEditingController();
 
   static const String apiKey = String.fromEnvironment('API_KEY');
@@ -401,19 +403,19 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.previsao_tempo',
               ),
-              if (_mapaAtivo == 'chuva')
+              if (_mapaChuva)
                 TileLayer(
                   urlTemplate:
                       'https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=$apiKey',
                   userAgentPackageName: 'com.example.previsao_tempo',
                 ),
-              if (_mapaAtivo == 'vento')
+              if (_mapaVento)
                 TileLayer(
                   urlTemplate:
                       'https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=$apiKey',
                   userAgentPackageName: 'com.example.previsao_tempo',
                 ),
-              if (_mapaAtivo == 'temp')
+              if (_mapaTemp)
                 TileLayer(
                   urlTemplate:
                       'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=$apiKey',
@@ -436,12 +438,11 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                   const Icon(Icons.map, color: Colors.white70, size: 12),
                   const SizedBox(width: 4),
                   Text(
-                    switch (_mapaAtivo) {
-                      'vento' => "Vento",
-                      'chuva' => "Chuva",
-                      'temp' => "Temp",
-                      _ => "Base",
-                    },
+                    [
+                      if (_mapaVento) "Vento",
+                      if (_mapaChuva) "Chuva",
+                      if (_mapaTemp) "Temp",
+                    ].join(" • "),
                     style: const TextStyle(color: Colors.white70, fontSize: 9),
                   ),
                 ],
@@ -455,16 +456,16 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildLayerChip("💨", "Vento", _mapaAtivo == 'vento', () {
-                  _selecionarCamada('vento');
+                _buildLayerChip("💨", "Vento", _mapaVento, () {
+                  setState(() => _mapaVento = !_mapaVento);
                 }),
                 const SizedBox(width: 6),
-                _buildLayerChip("🌧️", "Chuva", _mapaAtivo == 'chuva', () {
-                  _selecionarCamada('chuva');
+                _buildLayerChip("🌧️", "Chuva", _mapaChuva, () {
+                  setState(() => _mapaChuva = !_mapaChuva);
                 }),
                 const SizedBox(width: 6),
-                _buildLayerChip("🌡️", "Temp", _mapaAtivo == 'temp', () {
-                  _selecionarCamada('temp');
+                _buildLayerChip("🌡️", "Temp", _mapaTemp, () {
+                  setState(() => _mapaTemp = !_mapaTemp);
                 }),
               ],
             ),
@@ -472,12 +473,6 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
         ],
       ),
     );
-  }
-
-  void _selecionarCamada(String camada) {
-    setState(() {
-      _mapaAtivo = _mapaAtivo == camada ? '' : camada;
-    });
   }
 
   Widget _buildLayerChip(
