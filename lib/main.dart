@@ -50,6 +50,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
   int _humidityNum = 0;
   double _windMps = 0;
   List<Map<String, dynamic>> _previsaoHoras = [];
+  double _precipitacao = 0;
   double? _latitude;
   double? _longitude;
   bool carregando = true;
@@ -170,6 +171,13 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
           DateTime.fromMillisecondsSinceEpoch(data['sys']['sunset'] * 1000)
               .toLocal();
 
+      final rain = data['rain'];
+      double precipitacao = 0;
+      if (rain is Map<String, dynamic>) {
+        precipitacao =
+            ((rain['1h'] ?? rain['3h']) ?? 0).toDouble();
+      }
+
       setState(() {
         temperatura = data['main']['temp'].toStringAsFixed(0) + "°C";
         condicao = data['weather'][0]['description'].toLowerCase();
@@ -185,6 +193,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
         _tempNum = (data['main']['temp'] as num).toDouble();
         _humidityNum = data['main']['humidity'];
         _windMps = (data['wind']['speed'] as num).toDouble();
+        _precipitacao = precipitacao;
         carregando = false;
       });
       _pegarPrevisaoHoras();
@@ -384,22 +393,27 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
       );
     }
 
-    bool temChuva = condicao.contains('chuva') ||
-        condicao.contains('chuvas') ||
-        condicao.contains('trovoada') ||
-        condicao.contains('tempestade');
     bool tempestade =
         condicao.contains('trovoada') || condicao.contains('tempestade');
+    bool temPrecipitacaoReal = _precipitacao > 0 ||
+        condicao.contains('chuva') ||
+        condicao.contains('chuvas') ||
+        condicao.contains('trovoada') ||
+        condicao.contains('tempestade') ||
+        condicao.contains('granizo');
+
     double intensidade = 0;
     if (tempestade) {
-      intensidade = 0.8;
+      intensidade = 0.85;
+    } else if (_precipitacao > 0) {
+      intensidade = (_precipitacao / 6.0).clamp(0.3, 1.0);
     } else if (condicao.contains('forte') ||
         condicao.contains('intensa') ||
         condicao.contains('muito')) {
       intensidade = 1.0;
     } else if (condicao.contains('garoa') || condicao.contains('leve')) {
       intensidade = 0.3;
-    } else if (temChuva) {
+    } else if (temPrecipitacaoReal) {
       intensidade = 0.6;
     }
 
@@ -438,7 +452,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                       'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=$apiKey',
                   userAgentPackageName: 'com.example.previsao_tempo',
                 ),
-              if (_mapaAtivo == 'chuva')
+              if (_mapaAtivo == 'chuva' && temPrecipitacaoReal)
                 PolygonLayer(
                   polygonLabels: false,
                   polygons: [
@@ -453,11 +467,11 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                       ),
                   ],
                 ),
-              if (_mapaAtivo == 'chuva')
+              if (_mapaAtivo == 'chuva' && temPrecipitacaoReal)
                 Positioned.fill(
                   child: _CamadaChuva(
                     poligonos: _gerarPoligonosChuva(),
-                    intensidade: intensidade <= 0 ? 0.35 : intensidade,
+                    intensidade: intensidade <= 0 ? 0.5 : intensidade,
                     tempestade: tempestade,
                   ),
                 ),
