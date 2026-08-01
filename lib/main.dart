@@ -440,10 +440,10 @@ class _PrevisaoTelaState extends State<PrevisaoTela> {
                 ),
             ],
           ),
-          if (_mapaAtivo == 'chuva' && intensidade > 0)
+          if (_mapaAtivo == 'chuva')
             Positioned.fill(
               child: _ChuvaOverlay(
-                intensidade: intensidade,
+                intensidade: intensidade <= 0 ? 0.35 : intensidade,
                 tempestade: tempestade,
               ),
             ),
@@ -1409,18 +1409,42 @@ class _ChuvaOverlayState extends State<_ChuvaOverlay>
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
-          return CustomPaint(
-            size: Size.infinite,
-            painter: _ChuvaPainter(
-              t: _controller.value,
-              intensidade: widget.intensidade.clamp(0.0, 1.0),
-              tempestade: widget.tempestade,
-              gotas: _gotas,
-            ),
+          final t = _controller.value;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              CustomPaint(
+                painter: _ChuvaPainter(
+                  t: t,
+                  intensidade: widget.intensidade.clamp(0.0, 1.0),
+                  tempestade: widget.tempestade,
+                  gotas: _gotas,
+                ),
+              ),
+              if (widget.tempestade) ..._buildRaios(t),
+            ],
           );
         },
       ),
     );
+  }
+
+  List<Widget> _buildRaios(double t) {
+    final blink = (sin(t * 2 * pi * 2.5) * 0.5 + 0.5).clamp(0.15, 1.0);
+    final blink2 =
+        (sin(t * 2 * pi * 3.1 + 1.3) * 0.5 + 0.5).clamp(0.15, 1.0);
+    return [
+      Align(
+        alignment: Alignment(0.40 * 2 - 1, 0.30 * 2 - 1),
+        child: Icon(Icons.flash_on,
+            color: Colors.amber.withOpacity(blink), size: 26),
+      ),
+      Align(
+        alignment: Alignment(0.70 * 2 - 1, 0.50 * 2 - 1),
+        child: Icon(Icons.flash_on,
+            color: Colors.yellow[700]!.withOpacity(blink2), size: 34),
+      ),
+    ];
   }
 }
 
@@ -1485,7 +1509,7 @@ class _ChuvaPainter extends CustomPainter {
     _pintarPoligonos(canvas, blobs);
     _pintarGotas(canvas, size, blobs);
     _pintarPoca(canvas, blobs.first.centro, size);
-    if (tempestade) _pintarRaios(canvas, size);
+    if (tempestade) _pintarClarao(canvas, size);
   }
 
   void _pintarPoligonos(Canvas canvas, List<_Blob> blobs) {
@@ -1585,51 +1609,14 @@ class _ChuvaPainter extends CustomPainter {
     }
   }
 
-  void _pintarRaios(Canvas canvas, Size size) {
-    final posicoes = [
-      Offset(size.width * 0.40, size.height * 0.30),
-      Offset(size.width * 0.70, size.height * 0.50),
-    ];
-    final blink = (sin(t * 2 * pi * 2.5) * 0.5 + 0.5);
-
-    for (var i = 0; i < posicoes.length; i++) {
-      final centro = posicoes[i];
-      final escala = i == 1 ? 1.35 : 1.0;
-      final opacidade = i == 1
-          ? 0.25 + 0.55 * blink
-          : ((sin(t * 2 * pi * 3.1 + 1.3) * 0.5 + 0.5) * 0.6 + 0.2);
-
-      final path = Path();
-      final s = size.width * 0.02 * escala;
-      path
-        ..moveTo(0, 0)
-        ..lineTo(s * 0.9, s * 0.45)
-        ..lineTo(s * 0.25, s * 0.55)
-        ..lineTo(s * 0.7, s * 1.5)
-        ..lineTo(s * 0.1, s * 1.1)
-        ..lineTo(s * 0.3, s * 2.2)
-        ..lineTo(s * 0.95, s * 1.1)
-        ..lineTo(s * 0.55, s * 2.6)
-        ..close();
-
-      canvas.save();
-      canvas.translate(centro.dx, centro.dy);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0xFFFFD54F).withOpacity(opacidade)
-          ..style = PaintingStyle.fill,
-      );
-      canvas.restore();
-    }
-
+  void _pintarClarao(Canvas canvas, Size size) {
     final flash = sin(t * 2 * pi * 2.5) * 0.5 + 0.5;
     if (flash > 0.92) {
       canvas.drawRect(
         Offset.zero & size,
         Paint()
-          ..color = const Color(0xFFFFF6C9)
-              .withOpacity((flash - 0.92) * 4 * 0.06),
+          ..color =
+              const Color(0xFFFFF6C9).withOpacity((flash - 0.92) * 4 * 0.06),
       );
     }
   }
