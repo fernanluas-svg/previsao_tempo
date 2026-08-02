@@ -774,7 +774,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
           return GFCard(
             color: Colors.white.withOpacity(0.12),
             elevation: 2,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             content: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1317,7 +1317,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
           child: GFCard(
             color: Colors.white.withOpacity(0.12),
             elevation: 2,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(16),
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             content: GFListTile(
               avatar: const Text("🏃‍♂️", style: TextStyle(fontSize: 24)),
@@ -1344,7 +1344,7 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
             child: GFCard(
               color: Colors.white.withOpacity(0.12),
               elevation: 2,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(16),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               content: GFListTile(
                 avatar: const Text("🌿", style: TextStyle(fontSize: 24)),
