@@ -58,7 +58,51 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
   bool carregando = true;
   bool _usandoGPS = true;
   String _mapaAtivo = 'vento';
+  List<_FocoChuva> _focosChuva = [];
+  LatLngBounds? _boundsAtual;
+  Set<int>? _idsVisiveis;
+  double _zoomAtual = 7.0;
   final TextEditingController _cidadeController = TextEditingController();
+
+  bool get _tempestade =>
+      condicao.contains('trovoada') || condicao.contains('tempestade');
+
+  bool get _temPrecipitacaoReal =>
+      _precipitacao > 0 ||
+      condicao.contains('chuva') ||
+      condicao.contains('chuvas') ||
+      condicao.contains('trovoada') ||
+      condicao.contains('tempestade') ||
+      condicao.contains('granizo');
+
+  List<_FocoChuva> get _focosVisiveis {
+    final ids = _idsVisiveis;
+    if (ids == null) return _focosChuva;
+    final ordenados = ids.toList()..sort();
+    return [for (final i in ordenados) _focosChuva[i]];
+  }
+
+  void _atualizarFocosVisiveis() {
+    final bounds = _boundsAtual;
+    if (bounds == null) return;
+    final ids = <int>{};
+    for (var i = 0; i < _focosChuva.length; i++) {
+      if (bounds.contains(_focosChuva[i].posicao)) ids.add(i);
+    }
+    final antigos = _idsVisiveis ?? const <int>{};
+    if (antigos.length != ids.length) {
+      _idsVisiveis = ids;
+      setState(() {});
+      return;
+    }
+    for (final i in ids) {
+      if (!antigos.contains(i)) {
+        _idsVisiveis = ids;
+        setState(() {});
+        return;
+      }
+    }
+  }
 
   static const String apiKey = String.fromEnvironment('API_KEY');
 
@@ -222,6 +266,10 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
         _precipitacao = precipitacao;
         carregando = false;
       });
+      _focosChuva = _gerarFocosChuva();
+      _idsVisiveis = null;
+      _boundsAtual = null;
+      _zoomAtual = 7.0;
       _pegarPrevisaoHoras();
       _buscarQualidadeAr();
     } else if (response.statusCode == 404) {
@@ -455,6 +503,11 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
               interactionOptions: const InteractionOptions(
                 flags: InteractiveFlag.all,
               ),
+              onPositionChanged: (camera, hasGesture) {
+                _boundsAtual = camera.visibleBounds;
+                _zoomAtual = camera.zoom;
+                _atualizarFocosVisiveis();
+              },
             ),
             children: [
               TileLayer(
@@ -495,12 +548,20 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
                   ],
                 ),
               if (_mapaAtivo == 'chuva' && temPrecipitacaoReal)
-                Positioned.fill(
-                  child: _CamadaChuva(
-                    poligonos: _gerarPoligonosChuva(),
-                    intensidade: intensidade <= 0 ? 0.5 : intensidade,
-                    tempestade: tempestade,
-                  ),
+                MarkerLayer(
+                  markers: [
+                    for (final foco in _focosVisiveis)
+                      Marker(
+                        point: foco.posicao,
+                        width: _tamanhoFoco(),
+                        height: _tamanhoFoco(),
+                        alignment: Alignment.center,
+                        child: _FocoChuvaMarker(
+                          intensidade: foco.intensidade,
+                          tempestade: foco.tempestade,
+                        ),
+                      ),
+                  ],
                 ),
             ],
           ),
@@ -601,11 +662,44 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
     ];
   }
 
+  List<_FocoChuva> _gerarFocosChuva() {
+    if (_latitude == null || _longitude == null || !_temPrecipitacaoReal) {
+      return const [];
+    }
+
+    final seed = (_latitude! * 10000 + _longitude! * 10000).abs().round() &
+        0x7fffffff;
+    final rng = Random(seed);
+    final lat = _latitude!;
+    final lng = _longitude!;
+    final cosLat = cos(lat * pi / 180);
+    final focos = <_FocoChuva>[];
+
+    const int n = 12;
+    for (var i = 0; i < n; i++) {
+      final ang = (i / n) * 2 * pi + rng.nextDouble() * 0.4;
+      final raio = 0.15 + rng.nextDouble() * 0.4;
+      final distNorm = raio / 0.55;
+      final intensidade =
+          (1 - distNorm * 0.6 - rng.nextDouble() * 0.2).clamp(0.25, 1.0);
+      focos.add(_FocoChuva(
+        LatLng(lat + sin(ang) * raio, lng + cos(ang) * raio / cosLat),
+        intensidade,
+        _tempestade && intensidade > 0.7 && (i % 3 == 0),
+      ));
+    }
+
+    focos.add(_FocoChuva(LatLng(lat, lng), 1.0, _tempestade));
+    return focos;
+  }
+
   void _selecionarCamada(String camada) {
     setState(() {
       _mapaAtivo = _mapaAtivo == camada ? '' : camada;
     });
   }
+
+  double _tamanhoFoco() => (30 + _zoomAtual * 3).clamp(44, 96);
 
   Widget _botaoZoom(IconData icone, VoidCallback onTap) {
     return Material(
@@ -1496,46 +1590,47 @@ class BirdPainter extends CustomPainter {
       oldDelegate.color != color || oldDelegate.flap != flap;
 }
 
-class _CamadaChuva extends StatefulWidget {
-  final List<List<LatLng>> poligonos;
+class _FocoChuva {
+  final LatLng posicao;
   final double intensidade;
   final bool tempestade;
 
-  const _CamadaChuva({
-    required this.poligonos,
+  const _FocoChuva(this.posicao, this.intensidade, this.tempestade);
+}
+
+class _FocoChuvaMarker extends StatefulWidget {
+  final double intensidade;
+  final bool tempestade;
+
+  const _FocoChuvaMarker({
     required this.intensidade,
     required this.tempestade,
   });
 
   @override
-  State<_CamadaChuva> createState() => _CamadaChuvaState();
+  State<_FocoChuvaMarker> createState() => _FocoChuvaMarkerState();
 }
 
-class _CamadaChuvaState extends State<_CamadaChuva>
+class _FocoChuvaMarkerState extends State<_FocoChuvaMarker>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final List<_GotaTela> _gotas;
-  late final List<Offset> _pocas;
-  late final List<Offset> _raios;
-  final Random _rng = Random(23);
+  late final List<_GotaFoco> _gotas;
+  final Random _rng = Random(29);
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1200),
     )..repeat();
-    _gotas = List.generate(120, (_) {
-      return _GotaTela(
-        _rng.nextDouble(),
-        _rng.nextDouble(),
+    _gotas = List.generate(14, (_) {
+      return _GotaFoco(
+        _rng.nextDouble() * 2 - 1,
         0.8 + _rng.nextDouble() * 0.8,
         _rng.nextDouble(),
       );
     });
-    _pocas = List.generate(3, (_) => Offset(_rng.nextDouble(), _rng.nextDouble()));
-    _raios = List.generate(2, (_) => Offset(_rng.nextDouble(), _rng.nextDouble()));
   }
 
   @override
@@ -1546,214 +1641,168 @@ class _CamadaChuvaState extends State<_CamadaChuva>
 
   @override
   Widget build(BuildContext context) {
-    final camera = MapCamera.of(context);
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return CustomPaint(
-          painter: _CamadaChuvaPainter(
-            t: _controller.value,
-            camera: camera,
-            poligonos: widget.poligonos,
-            intensidade: widget.intensidade.clamp(0.0, 1.0),
-            tempestade: widget.tempestade,
-            gotas: _gotas,
-            pocas: _pocas,
-            raios: _raios,
-          ),
-        );
-      },
+    return IgnorePointer(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final t = _controller.value;
+          final blink =
+              (sin(t * 2 * pi * 2.5) * 0.5 + 0.5).clamp(0.15, 1.0);
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final lado = constraints.maxWidth;
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  CustomPaint(
+                    painter: _FocoChuvaPainter(
+                      t: t,
+                      intensidade: widget.intensidade.clamp(0.0, 1.0),
+                      gotas: _gotas,
+                    ),
+                  ),
+                  if (widget.tempestade)
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: Padding(
+                        padding: EdgeInsets.only(top: lado * 0.02),
+                        child: Icon(
+                          Icons.flash_on,
+                          size: lado * 0.4,
+                          color: Colors.amber.withOpacity(blink),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
 
-class _GotaTela {
+class _GotaFoco {
   final double x;
-  final double y;
   final double vel;
   final double fase;
 
-  const _GotaTela(this.x, this.y, this.vel, this.fase);
+  const _GotaFoco(this.x, this.vel, this.fase);
 }
 
-class _CamadaChuvaPainter extends CustomPainter {
+class _FocoChuvaPainter extends CustomPainter {
   final double t;
-  final MapCamera camera;
-  final List<List<LatLng>> poligonos;
   final double intensidade;
-  final bool tempestade;
-  final List<_GotaTela> gotas;
-  final List<Offset> pocas;
-  final List<Offset> raios;
+  final List<_GotaFoco> gotas;
 
-  _CamadaChuvaPainter({
+  _FocoChuvaPainter({
     required this.t,
-    required this.camera,
-    required this.poligonos,
     required this.intensidade,
-    required this.tempestade,
     required this.gotas,
-    required this.pocas,
-    required this.raios,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    for (final poligono in poligonos) {
-      final pts = <Offset>[];
-      for (final latLng in poligono) {
-        final p = camera.latLngToScreenPoint(latLng);
-        pts.add(Offset(p.x.toDouble(), p.y.toDouble()));
-      }
-      if (pts.length < 3) continue;
-
-      final path = Path()..moveTo(pts.first.dx, pts.first.dy);
-      for (var i = 1; i < pts.length; i++) {
-        path.lineTo(pts[i].dx, pts[i].dy);
-      }
-      path.close();
-
-      canvas.save();
-      canvas.clipPath(path);
-      final bbox = _boundingRect(pts);
-      _pintarGotas(canvas, bbox);
-      _pintarPocas(canvas, bbox);
-      if (tempestade) _pintarRaios(canvas, bbox);
-      canvas.restore();
-    }
-  }
-
-  Rect _boundingRect(List<Offset> pts) {
-    var l = double.infinity, t = double.infinity;
-    var r = double.negativeInfinity, b = double.negativeInfinity;
-    for (final p in pts) {
-      l = min(l, p.dx);
-      r = max(r, p.dx);
-      t = min(t, p.dy);
-      b = max(b, p.dy);
-    }
-    return Rect.fromLTRB(l, t, r, b);
-  }
-
-  void _pintarGotas(Canvas canvas, Rect bbox) {
-    final w = bbox.width;
-    final h = bbox.height;
+    final w = size.width;
+    final h = size.height;
     if (w <= 0 || h <= 0) return;
 
-    final area = w * h;
-    final count = (area / (1700 - intensidade * 900))
-        .round()
-        .clamp(8, 160);
-    final dropLen = 10.0 + intensidade * 6;
-    final paint = Paint()
-      ..color = const Color(0xFFCFE5FF).withOpacity(0.5 + intensidade * 0.2)
-      ..strokeWidth = 1.4
+    final cx = w / 2;
+    final cy = h / 2;
+    final raio = w / 2;
+
+    final circulo =
+        Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: raio));
+
+    canvas.drawPath(
+      circulo,
+      Paint()
+        ..color = const Color(0xFF5B7BA6).withOpacity(0.16 + intensidade * 0.10)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      circulo,
+      Paint()
+        ..color = const Color(0xFFA9C3E8).withOpacity(0.30)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+
+    canvas.save();
+    canvas.clipPath(circulo);
+
+    final n = (gotas.length * intensidade).round().clamp(0, gotas.length);
+    final paintGota = Paint()
+      ..color = const Color(0xFFCFE5FF).withOpacity(0.6)
+      ..strokeWidth = w * 0.02
       ..strokeCap = StrokeCap.round;
 
-    for (var i = 0; i < count; i++) {
-      final g = gotas[i % gotas.length];
-      final x = bbox.left + g.x * w;
+    for (var i = 0; i < n; i++) {
+      final g = gotas[i];
       final progresso = (t * g.vel + g.fase) % 1.0;
-      final y = bbox.top - dropLen + progresso * (h + 2 * dropLen);
+      final comprimento = h * 0.16;
+      final y = -comprimento + progresso * (h * 1.2 + comprimento);
+      final x = cx + g.x * raio * 0.7;
       canvas.drawLine(
         Offset(x, y),
-        Offset(x - w * 0.015, y + dropLen),
-        paint,
+        Offset(x - w * 0.02, y + comprimento),
+        paintGota,
       );
     }
+
+    _pintarPoca(canvas, Offset(cx, cy + raio * 0.5), raio);
+
+    canvas.restore();
   }
 
-  void _pintarPocas(Canvas canvas, Rect bbox) {
-    final raioBase = min(bbox.width, bbox.height) * 0.045;
-    final pocaRx = raioBase.clamp(6.0, 70.0);
-    final pocaRy = pocaRx * 0.5;
+  void _pintarPoca(Canvas canvas, Offset centro, double raio) {
+    final pocaRx = raio * 0.5;
+    final pocaRy = pocaRx * 0.45;
 
-    for (final p in pocas) {
-      final centro = Offset(
-        bbox.left + p.dx * bbox.width,
-        bbox.top + p.dy * bbox.height,
-      );
+    final corpo = Path()
+      ..addOval(Rect.fromCenter(
+          center: centro, width: pocaRx * 2, height: pocaRy * 2));
+    canvas.drawPath(
+      corpo,
+      Paint()..color = const Color(0xFF3E5A7D).withOpacity(0.45),
+    );
+    canvas.drawPath(
+      corpo,
+      Paint()
+        ..color = const Color(0xFFBFE0FF).withOpacity(0.30)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
 
-      final corpo = Path()
-        ..addOval(Rect.fromCenter(
-            center: centro, width: pocaRx * 2, height: pocaRy * 2));
-      canvas.drawPath(
-        corpo,
-        Paint()..color = const Color(0xFF3E5A7D).withOpacity(0.45),
-      );
-      canvas.drawPath(
-        corpo,
+    for (var i = 0; i < 3; i++) {
+      final prog = (t + i * 0.33) % 1.0;
+      final r = prog * pocaRx;
+      canvas.drawOval(
+        Rect.fromCenter(
+            center: centro, width: r * 2, height: r * 2 * (pocaRy / pocaRx)),
         Paint()
-          ..color = const Color(0xFFBFE0FF).withOpacity(0.30)
+          ..color = const Color(0xFFD6EAFF).withOpacity((1 - prog) * 0.5)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.0,
       );
-
-      for (var i = 0; i < 3; i++) {
-        final prog = (t + i * 0.33) % 1.0;
-        final r = prog * pocaRx;
-        canvas.drawOval(
-          Rect.fromCenter(
-              center: centro, width: r * 2, height: r * 2 * (pocaRy / pocaRx)),
-          Paint()
-            ..color = const Color(0xFFD6EAFF).withOpacity((1 - prog) * 0.5)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.0,
-        );
-      }
-
-      final paintSplash = Paint()
-        ..color = const Color(0xFFD6EAFF).withOpacity(0.7)
-        ..strokeWidth = 1.0
-        ..strokeCap = StrokeCap.round;
-      for (var i = 0; i < 4; i++) {
-        final prog = (t * 1.4 + i * 0.25) % 1.0;
-        final ang = i * (pi / 2) + pi / 4;
-        final d = pocaRx * 0.7 * (0.5 + 0.5 * prog);
-        final pos = Offset(
-            centro.dx + cos(ang) * d, centro.dy + sin(ang) * d * 0.4);
-        canvas.drawLine(pos, Offset(pos.dx, pos.dy - 2 - prog * 4), paintSplash);
-      }
     }
-  }
 
-  void _pintarRaios(Canvas canvas, Rect bbox) {
-    final blink = (sin(t * 2 * pi * 2.5) * 0.5 + 0.5).clamp(0.15, 1.0);
-    final blink2 =
-        (sin(t * 2 * pi * 3.1 + 1.3) * 0.5 + 0.5).clamp(0.15, 1.0);
-    final s = bbox.width.clamp(14.0, 40.0);
-
-    for (var i = 0; i < raios.length; i++) {
-      final centro = Offset(
-        bbox.left + raios[i].dx * bbox.width,
-        bbox.top + raios[i].dy * bbox.height,
-      );
-      final opacidade = i == 0 ? blink : blink2;
-
-      final path = Path();
-      path
-        ..moveTo(0, 0)
-        ..lineTo(s * 0.9, s * 0.45)
-        ..lineTo(s * 0.25, s * 0.55)
-        ..lineTo(s * 0.7, s * 1.5)
-        ..lineTo(s * 0.1, s * 1.1)
-        ..lineTo(s * 0.3, s * 2.2)
-        ..lineTo(s * 0.95, s * 1.1)
-        ..lineTo(s * 0.55, s * 2.6)
-        ..close();
-
-      canvas.save();
-      canvas.translate(centro.dx, centro.dy);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = const Color(0xFFFFD54F).withOpacity(opacidade)
-          ..style = PaintingStyle.fill,
-      );
-      canvas.restore();
+    final paintSplash = Paint()
+      ..color = const Color(0xFFD6EAFF).withOpacity(0.7)
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < 4; i++) {
+      final prog = (t * 1.4 + i * 0.25) % 1.0;
+      final ang = i * (pi / 2) + pi / 4;
+      final d = pocaRx * 0.7 * (0.5 + 0.5 * prog);
+      final pos = Offset(
+          centro.dx + cos(ang) * d, centro.dy + sin(ang) * d * 0.4);
+      canvas.drawLine(pos, Offset(pos.dx, pos.dy - 2 - prog * 4), paintSplash);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _CamadaChuvaPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _FocoChuvaPainter old) =>
+      old.t != t || old.intensidade != intensidade;
 }
