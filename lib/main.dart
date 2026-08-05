@@ -285,35 +285,61 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
     }
   }
 
+  String _wmoParaIcone(int codigo, DateTime hora) {
+    final noite = hora.hour >= 18 || hora.hour < 6;
+    final suf = noite ? "n" : "d";
+    final base = _wmoCodeBase(codigo);
+    return "$base$suf";
+  }
+
+  String _wmoCodeBase(int codigo) {
+    if (codigo == 0) return "01";
+    if (codigo == 1) return "02";
+    if (codigo == 2) return "03";
+    if (codigo == 3) return "04";
+    if (codigo == 45 || codigo == 48) return "50";
+    if (codigo == 51 || codigo == 53 || codigo == 55 ||
+        codigo == 56 || codigo == 57) return "09";
+    if (codigo == 61 || codigo == 63 || codigo == 65 ||
+        codigo == 66 || codigo == 67) return "10";
+    if (codigo == 71 || codigo == 73 || codigo == 75 ||
+        codigo == 77 || codigo == 85 || codigo == 86) return "13";
+    if (codigo == 80 || codigo == 81 || codigo == 82) return "09";
+    return "11";
+  }
+
   Future<void> _pegarPrevisaoHoras() async {
     if (_latitude == null || _longitude == null) return;
 
     try {
       String url =
-          "https://api.openweathermap.org/data/2.5/forecast?lat=$_latitude&lon=$_longitude&appid=$apiKey&units=metric&lang=pt_br";
+          "https://api.open-meteo.com/v1/forecast?latitude=$_latitude&longitude=$_longitude&hourly=temperature_2m,weather_code&timezone=auto&forecast_hours=48";
       var response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
-        List<dynamic> lista = data['list'];
+        List<dynamic> tempos = data['hourly']['time'];
+        List<dynamic> temps = data['hourly']['temperature_2m'];
+        List<dynamic> codigos = data['hourly']['weather_code'];
+
+        final agora = DateTime.now();
+        final horaAtual =
+            DateTime(agora.year, agora.month, agora.day, agora.hour);
         List<Map<String, dynamic>> proximas = [];
 
-        for (var item in lista) {
-          if (proximas.length >= 5) break;
-          DateTime itemDt = DateTime.parse(item['dt_txt']);
-          if (itemDt
-              .isAfter(DateTime.now().subtract(const Duration(hours: 2)))) {
-            String hora = "${itemDt.hour.toString().padLeft(2, '0')}:00";
-            String temp = "${item['main']['temp'].toStringAsFixed(0)}°";
-            String icon = item['weather'][0]['icon'];
-            String iconUrl =
-                "https://openweathermap.org/img/wn/$icon@2x.png";
-            proximas.add({
-              'hora': hora,
-              'temperatura': temp,
-              'iconeUrl': iconUrl,
-            });
-          }
+        for (var i = 0; i < tempos.length; i++) {
+          if (proximas.length >= 12) break;
+          DateTime itemDt = DateTime.parse(tempos[i]);
+          if (itemDt.isBefore(horaAtual)) continue;
+
+          String hora = "${itemDt.hour.toString().padLeft(2, '0')}:00";
+          String temp = "${(temps[i] as num).toDouble().round()}°";
+          String icono = _wmoParaIcone((codigos[i] as int), itemDt);
+          proximas.add({
+            'hora': hora,
+            'temperatura': temp,
+            'iconeUrl': "https://openweathermap.org/img/wn/$icono@2x.png",
+          });
         }
 
         setState(() {
