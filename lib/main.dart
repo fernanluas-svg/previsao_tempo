@@ -1309,15 +1309,9 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
 
   Widget _infoCard(IconData icone, String label, String valor) {
     return Expanded(
-      child: GFCard(
-        color: Colors.white.withOpacity(0.12),
-        elevation: 2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(25),
-        ),
-        clipBehavior: Clip.antiAlias,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        content: Column(
+      child: _MagicGlowCard(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icone, color: Colors.white70, size: 16),
@@ -1341,21 +1335,17 @@ class _PrevisaoTelaState extends State<PrevisaoTela>
     );
   }
 
-  Widget _buildEsportesAQIRow() {
+Widget _buildEsportesAQIRow() {
     var esportes = _getEsportesIndex();
     return Row(
       children: [
         Expanded(
-child: GFCard(
-              color: Colors.white.withOpacity(0.12),
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-              clipBehavior: Clip.antiAlias,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              content: GFListTile(
-                avatar: const Text("🏃‍♂️", style: TextStyle(fontSize: 24)),
+          child: _MagicGlowCard(
+            padding: EdgeInsets.zero,
+            beamStartColor: const Color(0xFF16A34A),
+            beamEndColor: const Color(0xFF4ADE80),
+            child: GFListTile(
+              avatar: const Text("🏃‍♂️", style: TextStyle(fontSize: 24)),
               title: const Text(
                 "Esportes",
                 style: TextStyle(fontSize: 11, color: Colors.white60),
@@ -1368,7 +1358,7 @@ child: GFCard(
                   color: esportes['cor'],
                 ),
               ),
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               margin: EdgeInsets.zero,
             ),
           ),
@@ -1376,16 +1366,12 @@ child: GFCard(
         if (aqi > 0) ...[
           const SizedBox(width: 10),
           Expanded(
-            child: GFCard(
-              color: Colors.white.withOpacity(0.12),
-              elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-              clipBehavior: Clip.antiAlias,
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              content: GFListTile(
-                avatar: const Text("🌿", style: TextStyle(fontSize: 24)),
+child: _MagicGlowCard(
+                padding: EdgeInsets.zero,
+                beamStartColor: const Color(0xFF7C3AED),
+                beamEndColor: const Color(0xFFF760F6),
+                child: GFListTile(
+                  avatar: const Text("🌿", style: TextStyle(fontSize: 24)),
                 title: const Text(
                   "Qualidade do Ar",
                   style: TextStyle(fontSize: 11, color: Colors.white60),
@@ -1397,7 +1383,7 @@ child: GFCard(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
                 margin: EdgeInsets.zero,
               ),
             ),
@@ -1727,6 +1713,188 @@ class _GotaFoco {
   final double fase;
 
   const _GotaFoco(this.x, this.vel, this.fase);
+}
+
+class _MagicGlowCard extends StatefulWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final Color beamStartColor;
+  final Color beamEndColor;
+
+  const _MagicGlowCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(12),
+    this.beamStartColor = const Color(0xFF2563EB),
+    this.beamEndColor = const Color(0xFF22D3EE),
+  });
+
+  @override
+  State<_MagicGlowCard> createState() => _MagicGlowCardState();
+}
+
+class _MagicGlowCardState extends State<_MagicGlowCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _beamController;
+  Offset? _pointer;
+
+  static const double _radius = 22;
+  static const Duration _beamDuration = Duration(seconds: 6);
+
+  @override
+  void initState() {
+    super.initState();
+    _beamController = AnimationController(
+      vsync: this,
+      duration: _beamDuration,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _beamController.dispose();
+    super.dispose();
+  }
+
+  void _setPointer(Offset? position) {
+    if (_pointer == position) return;
+    setState(() => _pointer = position);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onHover: (e) => _setPointer(e.localPosition),
+      onExit: (_) => _setPointer(null),
+      child: Listener(
+        onPointerDown: (e) => _setPointer(e.localPosition),
+        onPointerMove: (e) => _setPointer(e.localPosition),
+        onPointerUp: (_) => _setPointer(null),
+        onPointerCancel: (_) => _setPointer(null),
+        child: AnimatedBuilder(
+          animation: _beamController,
+          builder: (context, child) {
+            return CustomPaint(
+              painter: _MagicGlowCardPainter(
+                progress: _beamController.value,
+                pointer: _pointer,
+                radius: _radius,
+                startColor: widget.beamStartColor,
+                endColor: widget.beamEndColor,
+              ),
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(_radius),
+                  color: const Color(0xFF0E1626).withOpacity(0.55),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                padding: widget.padding,
+                child: widget.child,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MagicGlowCardPainter extends CustomPainter {
+  final double progress;
+  final Offset? pointer;
+  final double radius;
+  final Color startColor;
+  final Color endColor;
+
+  _MagicGlowCardPainter({
+    required this.progress,
+    required this.pointer,
+    required this.radius,
+    required this.startColor,
+    required this.endColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = (Offset.zero & size).deflate(1.2);
+    final rrect = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular((radius - 1.2).clamp(0, double.infinity)),
+    );
+
+    canvas.save();
+    canvas.clipRRect(rrect);
+
+    final pointer = this.pointer;
+    if (pointer != null && size.longestSide > 0) {
+      final raio = size.longestSide * 0.9;
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = const RadialGradient(
+            colors: [
+              Color(0x1AFFFFFF),
+              Color(0x05FFFFFF),
+              Color(0x00000000),
+            ],
+          ).createShader(Rect.fromCircle(center: pointer, radius: raio)),
+      );
+    }
+
+    final w = rect.width;
+    final h = rect.height;
+    if (w <= 0 || h <= 0) {
+      canvas.restore();
+      return;
+    }
+
+    final perimeter = 2 * (w + h);
+    final trail = perimeter * 0.34;
+    final start = progress * perimeter;
+    const steps = 140;
+
+    for (var i = 0; i <= steps; i++) {
+      final t = i / steps;
+      final d = (start + trail * t) % perimeter;
+      final point = _pointAtDistance(rect, d);
+      final alpha = sin(pi * t);
+      final color = Color.lerp(startColor, endColor, t)!;
+      canvas.drawPoints(
+        PointMode.points,
+        [point],
+        Paint()
+          ..color = color.withOpacity(alpha * 0.9)
+          ..strokeWidth = 2.4
+          ..strokeCap = StrokeCap.round
+          ..blendMode = BlendMode.plus,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  Offset _pointAtDistance(Rect rect, double d) {
+    final w = rect.width;
+    final h = rect.height;
+    final top = w;
+    final right = w + h;
+    final bottom = 2 * w + h;
+    final left = rect.left;
+    final topY = rect.top;
+
+    if (d < top) return Offset(left + d, topY);
+    if (d < right) return Offset(left + w, topY + (d - top));
+    if (d < bottom) return Offset(left + w - (d - right), topY + h);
+    return Offset(left, topY + h - (d - bottom));
+  }
+
+  @override
+  bool shouldRepaint(covariant _MagicGlowCardPainter old) =>
+      old.progress != progress ||
+      old.pointer != pointer ||
+      old.radius != radius ||
+      old.startColor != startColor ||
+      old.endColor != endColor;
 }
 
 class _FocoChuvaPainter extends CustomPainter {
